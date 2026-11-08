@@ -3,6 +3,7 @@ package assignment;
 import java.awt.Point;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -67,18 +68,6 @@ public class BoundedVolumeHierarchy implements BVH{
         public AVLNode getRight() {return right;}
 
         public Shape getShape() {return shape;}
-    }
-
-    // helpers
-    private AVLNode insertHelper(AVLNode node, Shape shape) {
-        //insert at current position if at child of leaf node
-        if (node == null) {
-            size ++;
-            return new AVLNode(shape.getMinSurroundingPoint(), shape.getMaxSurroundingPoint(), shape);
-        }
-
-        //need to compare
-        return null;
     }
 
 
@@ -191,6 +180,18 @@ public class BoundedVolumeHierarchy implements BVH{
         root = insertHelper(root, shape);
     }
 
+        // helpers
+    private AVLNode insertHelper(AVLNode node, Shape shape) {
+        //insert at current position if at child of leaf node
+        if (node == null) {
+            size ++;
+            return new AVLNode(shape.getMinSurroundingPoint(), shape.getMaxSurroundingPoint(), shape);
+        }
+
+        //need to compare
+        return null;
+    }
+
     @Override
     public void remove(Shape shape) {
         // toDo
@@ -198,13 +199,66 @@ public class BoundedVolumeHierarchy implements BVH{
 
     @Override
     public Set<Shape> findCollision(Point2D.Double point) {
-        // toDo
-        return null;
+        //recursive traversal, checks bounding boxes of each node to narrow down
+        if (point == null) throw new IllegalArgumentException("Point cannot be null");
+        
+        HashSet<Shape> collisions = new HashSet<>();
+        collisionsHelper(root, point, collisions);
+        
+        return collisions;
+    }
+
+    private void collisionsHelper(AVLNode node, Point2D.Double point, HashSet<Shape> collisions) {
+        if (node == null) return;
+
+        //check bounding box of node
+        if (node.getMin().x <= point.x && point.x <= node.getMax().x && node.getMin().y <= point.y && point.y <= node.getMax().y) {
+            //base case: if node is a leaf, check if the shape collides with the point
+            if (node.isLeaf()) {
+                if (node.shape.containsPoint(point)) collisions.add(node.shape);
+                return;
+            }
+
+            collisionsHelper(node.getLeft(), point, collisions);
+            collisionsHelper(node.getRight(), point, collisions);
+        }
     }
 
     @Override
     public Shape intersectRay(Point2D.Double origin, Vector2D direction) {
-        // toDo
+        if (origin == null || direction == null) throw new IllegalArgumentException("Origin and direction cannot be null");
+
+        Point originPoint = new Point((int)(origin.x), (int)(origin.y));
+        return intersectRayHelper(root, origin, direction);
+    }
+
+    private Shape intersectRayHelper(AVLNode node, Point2D.Double origin, Vector2D direction) {
+        if (node == null) return null;
+
+        //check if ray touches the shape
+        Rectangle cur = new Rectangle(node.getMin(), node.getMax());
+        Point originPoint = new Point((int)(origin.x), (int)(origin.y));
+
+        if (cur.doesRayIntersect(originPoint, direction)) {
+            if (node.isLeaf()) {        
+                if (node.shape.findIntersection(originPoint, direction) != null) {
+                    return node.shape;
+                } else return null;
+            }
+
+            Shape left = intersectRayHelper(node.getLeft(), origin, direction);
+            Shape right = intersectRayHelper(node.getRight(), origin, direction);
+
+            if (left != null && right != null) {
+                return BVH.distanceBetweenPoints(origin, left.findIntersection(originPoint, direction)) < BVH.distanceBetweenPoints(origin, right.findIntersection(originPoint, direction)) ? left : right;
+            } else if (left != null) {
+                return left;
+            } else if (right != null) {
+                return right;
+            }
+            return null;
+        }
+
         return null;
     }
 
