@@ -12,6 +12,7 @@ public class BoundedVolumeHierarchy implements BVH{
     private SplitMethod splitMethod;
     private AVLNode root;
     private int size;
+    private boolean removed;
 
     //every node has 2 avlnode children or is a leaf node (is a shape) and has 2 null children
     private static class AVLNode {
@@ -68,6 +69,10 @@ public class BoundedVolumeHierarchy implements BVH{
         public AVLNode getRight() {return right;}
 
         public Shape getShape() {return shape;}
+
+        public void setLeft(AVLNode left) {this.left = left; update();}
+
+        public void setRight(AVLNode right) {this.right = right; update();}
     }
 
 
@@ -176,26 +181,180 @@ public class BoundedVolumeHierarchy implements BVH{
     @Override
     public void insert(Shape shape) {
         // toDo
+        if (shape == null) throw new IllegalArgumentException("Shape cannot be null");
+
+        if (root == null) {
+            root = new AVLNode(shape.getMinSurroundingPoint(), shape.getMaxSurroundingPoint(), shape);
+        }
         //call recursive insert helper method (like in the example)
-        root = insertHelper(root, shape);
+        else root = insertHelper(root, shape);
+        size ++;
     }
 
         // helpers
     private AVLNode insertHelper(AVLNode node, Shape shape) {
-        //insert at current position if at child of leaf node
-        if (node == null) {
-            size ++;
-            return new AVLNode(shape.getMinSurroundingPoint(), shape.getMaxSurroundingPoint(), shape);
+        //if reached a leaf node, create new internal node above it with that leaf and a new leaf for the new shape
+        if (node.isLeaf()) {
+            return new AVLNode(node, new AVLNode(shape.getMinSurroundingPoint(), shape.getMaxSurroundingPoint(), shape));
         }
 
-        //need to compare
-        return null;
+        //if one child is a leaf and one isnt, call recursion on that to balance the tree
+        if (node.getLeft().isLeaf() && !node.getRight().isLeaf()) {
+            node.setLeft(insertHelper(node.getLeft(), shape));
+            return balance(node);
+        } else if (!node.getLeft().isLeaf() && node.getRight().isLeaf()) {
+            node.setRight(insertHelper(node.getRight(), shape));
+            return balance(node);
+        }
+        
+        //otherwise, pick the child whose bounding box changes the least when adding the new shape
+        //multiply the width and height of the bounding boxes to get the area
+        int leftBefore = area(node.getLeft().getMin(), node.getLeft().getMax());
+        int rightBefore = area(node.getRight().getMin(), node.getRight().getMax());
+
+        //calculate points after adding the shape for min and max using the current node's bounding box and the new shape's bounding box
+        Point leftMinAfter = new Point(Math.min(node.getLeft().getMin().x, (int)(shape.getMinSurroundingPoint().getX())), Math.min(node.getLeft().getMin().y, (int)(shape.getMinSurroundingPoint().getY())));
+        Point leftMaxAfter = new Point(Math.max(node.getLeft().getMax().x, (int)(shape.getMaxSurroundingPoint().getX())), Math.max(node.getLeft().getMax().y, (int)(shape.getMaxSurroundingPoint().getY())));
+        Point rightMinAfter = new Point(Math.min(node.getRight().getMin().x, (int)(shape.getMinSurroundingPoint().getX())), Math.min(node.getRight().getMin().y, (int)(shape.getMinSurroundingPoint().getY())));
+        Point rightMaxAfter = new Point(Math.max(node.getRight().getMax().x, (int)(shape.getMaxSurroundingPoint().getX())), Math.max(node.getRight().getMax().y, (int)(shape.getMaxSurroundingPoint().getY())));
+
+        double leftAfter = area(leftMinAfter, leftMaxAfter);
+        double rightAfter = area(rightMinAfter, rightMaxAfter);
+        double leftChange = leftAfter - leftBefore;
+        double rightChange = rightAfter - rightBefore;
+
+        if (leftChange < rightChange) {
+            node.setLeft(insertHelper(node.getLeft(), shape));
+            return balance(node);
+        } else if (leftChange > rightChange) {
+            node.setRight(insertHelper(node.getRight(), shape));
+            return balance(node);
+        }
+
+        //if change is same, should check height
+        if (node.getLeft().getHeight() < node.getRight().getHeight()) {
+            node.setLeft(insertHelper(node.getLeft(), shape));
+            return balance(node);
+        } else if (node.getLeft().getHeight() > node.getRight().getHeight()) {
+            node.setRight(insertHelper(node.getRight(), shape));
+            return balance(node);
+        }
+
+        //pick randomly
+        if (Math.random() < 0.5) {
+            node.setLeft(insertHelper(node.getLeft(), shape));
+        } else {
+            node.setRight(insertHelper(node.getRight(), shape));
+        }
+        return balance(node);
+    }
+
+    private int area(Point min, Point max) {
+        return (max.x - min.x) * (max.y - min.y);
+    }
+
+    //balances the AVL tree after an insertion or deletion
+    //if any child's height is more than 1 greater than the other, perform a rotation to balance the tree
+    private AVLNode balance(AVLNode node) {
+        //
+        if (node == null || node.isLeaf()) return node;
+        int diff = node.getLeft().getHeight() - node.getRight().getHeight();
+
+        if (diff > 1) {
+            if (node.getLeft().getLeft().getHeight() >= node.getLeft().getRight().getHeight()) {
+                node = rotateRight(node); // left-left
+            } else { //rotate twice
+                node.setLeft(rotateLeft(node.getLeft()));   // left-right
+                node = rotateRight(node);
+            }
+        } else if (diff < -1) {
+            // right-heavy (mirror)
+            if (node.getRight().getRight().getHeight() >= node.getRight().getLeft().getHeight()) {
+                node = rotateLeft(node);             // right-right
+            } else {
+                node.setRight(rotateRight(node.getRight()));  // right-left
+                node = rotateLeft(node);
+            }
+        }
+
+        node.update();
+        return node;
+    }
+
+    //moves a child up and its parent to the right
+    //ex: 
+    //                            child2
+    //                        /           \
+    //                  child1        child2.getright
+    //             /           \
+    //  child1.getLeft         child1.getRight
+    //
+    // becomes:
+    //                              child1
+    //                        /                \
+    //                 child1.getLeft           child2 
+    //                                      /            \ 
+    //                                child1.getRight     child2.getRight
+    //
+    //rotating once doesn't change imbalance (just flips it), so have to rotate twice
+
+    private AVLNode rotateRight(AVLNode child2) {
+        AVLNode child1 = child2.getLeft();
+        child2.setLeft(child1.getRight()); //these call update() internally, hieght gets updateed
+        child1.setRight(child2);
+        return child1;
+    }
+
+    //same but opposite for rotateLeft
+    private AVLNode rotateLeft(AVLNode child2) {
+        AVLNode child1 = child2.getRight();
+        child2.setRight(child1.getLeft());
+        child1.setLeft(child2);
+        return child1;
     }
 
     @Override
     public void remove(Shape shape) {
-        // toDo
+        if (shape == null) throw new IllegalArgumentException("Shape cannot be null");
+        if (root == null) return;
+
+        // flag to check if the remove occured (will trip in the helper)
+        removed = false;
+        root = removeHelper(root, shape);
+        if (removed) size--;
     }
+
+    //for each node, returns the node as is if not the shape, otherwise removes the subtree above the leaf and replaces it with the other child
+    private AVLNode removeHelper(AVLNode node, Shape shape) {
+        //base case: if not the shape, returns the leaf, otherwise retursn null (so it will return the other left/right as the node)
+        if (node.isLeaf()) {
+            if (!removed && node.shape == shape) {
+                removed = true;
+                return null;
+            }
+            return node;
+        }
+
+        Point shapeMin = shape.getMinSurroundingPoint();
+        Point shapeMax = shape.getMaxSurroundingPoint();
+
+        //if the shape is not in the box, retursn the node unchanged
+        if (shapeMax.x < node.getMin().x || shapeMin.x > node.getMax().x || shapeMax.y < node.getMin().y || shapeMin.y > node.getMax().y) return node;
+
+        AVLNode left = removeHelper(node.getLeft(), shape);
+        //cannot be leaf (first if checks for that), so if left child is null, it must have been the shape removed
+        //replace the node itself with the right child
+        if (left == null) return node.getRight();
+
+        //if the shape has already been removed, skip removing the right child
+        AVLNode right = removed ? node.getRight() : removeHelper(node.getRight(), shape);
+        if (right == null) return node.getLeft();
+
+        node.setLeft(left);
+        node.setRight(right);
+        return balance(node);
+    }
+
 
     @Override
     public Set<Shape> findCollision(Point2D.Double point) {
