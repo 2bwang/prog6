@@ -328,7 +328,7 @@ public class BoundedVolumeHierarchy implements BVH{
     private AVLNode removeHelper(AVLNode node, Shape shape) {
         //base case: if not the shape, returns the leaf, otherwise retursn null (so it will return the other left/right as the node)
         if (node.isLeaf()) {
-            if (!removed && node.shape == shape) {
+            if (!removed && node.shape.equals(shape)) {
                 removed = true;
                 return null;
             }
@@ -394,7 +394,7 @@ public class BoundedVolumeHierarchy implements BVH{
     private Shape intersectRayHelper(AVLNode node, Point2D.Double origin, Vector2D direction) {
         if (node == null) return null;
 
-        //check if ray touches the shape
+        //check if ray falls in the bounding box of the current node, only continues if it does
         Rectangle cur = new Rectangle(node.getMin(), node.getMax());
         Point originPoint = new Point((int)(origin.x), (int)(origin.y));
 
