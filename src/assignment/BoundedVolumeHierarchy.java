@@ -4,16 +4,60 @@ import java.awt.Point;
 import java.awt.geom.Point2D;
 import java.util.List;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
 
 public class BoundedVolumeHierarchy implements BVH{
 
     private SplitMethod splitMethod;
-    private BoundedVolumeHierarchy left;
-    private BoundedVolumeHierarchy right;
 
-    private Point min;
-    private Point max;
-    private Shape triangle;
+    private static class AVLNode {
+        private int height;
+        private AVLNode left;
+        private AVLNode right;
+
+        private Point min;
+        private Point max;
+        private Shape shape;
+
+        public AVLNode(Point min, Point max, Shape shape) {
+            this.min = min;
+            this.max = max;
+            this.shape = shape;
+            this.left = null;
+            this.right = null;
+            this.height = 0;
+        }
+
+        public void insert(Shape shape) {
+            // toDo
+        }
+
+        public void remove(Shape shape) {
+            // toDo
+        }
+
+        public void balance() {
+            // toDo
+        }
+
+        public int size() {return size;}
+
+        public boolean isEmpty() {return size == 0;}
+
+        public Point getMin() {return min;}
+
+        public Point getMax() {return max;}
+
+        public int getHeight() {return height;}
+
+        public Node getLeft() {return left;}
+
+        public Node getRight() {return right;}
+
+        public Shape getShape() {return shape;}
+    }
+
 
     @Override
     public void setSplitMethod(SplitMethod splitMethod) {
