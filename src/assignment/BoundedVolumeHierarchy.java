@@ -443,7 +443,7 @@ public class BoundedVolumeHierarchy implements BVH{
                 sb.append(" (").append(t.c.x).append(", ").append(t.c.y).append(")");
                 sb.append("\n");
             } else {
-                sb.append(node.shape.toString()).append("\n");
+                sb.append(node.shape.toString().stripTrailing()).append("\n"); //some shapes might have trailing spaces
             }
             return;
         }
