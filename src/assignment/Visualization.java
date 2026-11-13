@@ -2,6 +2,7 @@ package assignment;
 
 import java.awt.*;
 import java.awt.geom.Point2D;
+import java.util.HashSet;
 import java.util.LinkedList;
 
 public class Visualization {
@@ -85,38 +86,72 @@ public class Visualization {
      * @return              All points that should be drawn other than the square
      */
     public LinkedList<Point> drawGUI() {
-        //store each point on the border (400,400)
-        LinkedList<Point> aimPoints = new LinkedList<>();
-        for (int x = 0; x <= 400; x++) {
-            aimPoints.add(new Point(x, 0));
-            aimPoints.add(new Point(x, 400));
-        }
-        for (int y = 0; y <= 400; y++) {
-            aimPoints.add(new Point(0, y));
-            aimPoints.add(new Point(400, y));
-        }
-
+        HashSet<Point> pixels = new HashSet<>(); //so corners dont get added twice
         Point2D.Double center = new Point2D.Double(sX, sY); //center of the square
-        Point centerPoint = new Point(sX, sY);
 
-        LinkedList<Point> hitPoints = new LinkedList<>();
-        //draw rays to each of these points
-        for (Point aimPoint : aimPoints) {
-            Vector2D direction = new Vector2D(aimPoint.x - 200, aimPoint.y - 200);
-            Shape hitShape = boundingVolumeHierarchy.intersectRay(center, direction);
-            if (hitShape == null) continue;
+        //draws rays at each shape instead of everywhere
+        for (Shape shape : boundingVolumeHierarchy.getShapes()) {
+            Triangle t = (Triangle) shape;
+            Point[][] edges = {{t.a, t.b}, {t.b, t.c}, {t.c, t.a}};
 
+            for (Point[] edge : edges) {
+                //walk along the edges one pixel at a time
+                int steps = Math.max(Math.abs(edge[1].x - edge[0].x), Math.abs(edge[1].y - edge[0].y));
+                for (int i = 0; i <= steps; i++) {
+                    double x = edge[0].x;
+                    if (steps != 0) x += (double) i * (edge[1].x - edge[0].x) / steps;
+                    double y = edge[0].y;
+                    if (steps != 0) y += (double) i * (edge[1].y - edge[0].y) / steps;
+                    int guiX = (int) x + 200 - sX;
+                    int guiY = (int) y + 200 - sY;
+                    
+                    if (guiX < 0 || guiX >= 400 || guiY < 0 || guiY >= 400) continue; //off screen
 
-            //if it hist a shape and its on screen, save the point it hit the shape at
-            Point2D.Double hitPoint = hitShape.findIntersection(centerPoint, direction);
-            if (hitPoint != null) {
-                //convert that point to gui coords (+200 - square coord)
-                int guiX = (int)hitPoint.x + 200 - sX;
-                int guiY = (int)hitPoint.y + 200 - sY;
-                 if (guiX >= 0 && guiX <= 400 && guiY >= 0 && guiY <= 400)hitPoints.add(new Point(guiX, guiY));
+                    //if the ray hits this point before anything else, draw it
+                    //some points are blocked by other shapes/triangle edges
+                    Vector2D direction = new Vector2D(x - sX, y - sY);
+                    if (boundingVolumeHierarchy.intersectRay(center, direction) != t) continue; //intersects another triangle first
+                    Point2D.Double hitPoint = t.findIntersection(new Point(sX, sY), direction);
+                    if (hitPoint != null && hitPoint.distance(x, y) < 0.5) pixels.add(new Point(guiX, guiY));
+                }
             }
         }
+        return new LinkedList<>(pixels);
 
-        return hitPoints;
+
+        // //store each point on the border (400,400)
+        // HashSet<Point> pixels = new HashSet<>(); //so corners dont get added twice
+        // LinkedList<Point> aimPoints = new LinkedList<>();
+        // for (int x = 0; x <= 400; x++) {
+        //     aimPoints.add(new Point(x, 0));
+        //     aimPoints.add(new Point(x, 400));
+        // }
+        // for (int y = 0; y <= 400; y++) {
+        //     aimPoints.add(new Point(0, y));
+        //     aimPoints.add(new Point(400, y));
+        // }
+
+        // Point2D.Double center = new Point2D.Double(sX, sY); //center of the square
+        // Point centerPoint = new Point(sX, sY);
+
+        // LinkedList<Point> hitPoints = new LinkedList<>();
+        // //draw rays to each of these points
+        // for (Point aimPoint : aimPoints) {
+        //     Vector2D direction = new Vector2D(aimPoint.x - 200, aimPoint.y - 200);
+        //     Shape hitShape = boundingVolumeHierarchy.intersectRay(center, direction);
+        //     if (hitShape == null) continue;
+
+
+        //     //if it hist a shape and its on screen, save the point it hit the shape at
+        //     Point2D.Double hitPoint = hitShape.findIntersection(centerPoint, direction);
+        //     if (hitPoint != null) {
+        //         //convert that point to gui coords (+200 - square coord)
+        //         int guiX = (int)hitPoint.x + 200 - sX;
+        //         int guiY = (int)hitPoint.y + 200 - sY;
+        //          if (guiX >= 0 && guiX < 400 && guiY >= 0 && guiY < 400) hitPoints.add(new Point(guiX, guiY));
+        //     }
+        // }
+
+        // return hitPoints;
     }
 }

@@ -382,4 +382,58 @@ public class BVHTest {
         assertTrue(bvh.findCollision(new java.awt.geom.Point2D.Double(2, 4)).contains(t2));
     }
 
+    //checks that first/last row pixels stay inside the 400x400 frame
+    @Test
+    void testDrawGUIScreenEdges() {
+        //triangles on gui y = 399 and gui y = 0
+        BoundedVolumeHierarchy bvh = new BoundedVolumeHierarchy();
+        bvh.buildBVH(java.util.Arrays.asList(new Triangle(new java.awt.Point(-1000, 199), new java.awt.Point(1000, 199), new java.awt.Point(0, 1000)), new Triangle(new java.awt.Point(-1000, -200), new java.awt.Point(1000, -200), new java.awt.Point(0, -1000))));
+        Visualization vis = new Visualization();
+        vis.setBoundingVolumeHierarchy(bvh);
+        List<java.awt.Point> pixels = vis.drawGUI();
+
+        for (java.awt.Point p : pixels) assertTrue(p.x >= 0 && p.x < 400 && p.y >= 0 && p.y < 400);
+        assertTrue(drawnNear(pixels, 200, 399)); // bottom row
+        assertTrue(drawnNear(pixels, 200, 0)); // top row
+        assertTrue(drawnNear(pixels, 0, 399) && drawnNear(pixels, 399, 0)); // reaches the corners
+    }
+
+    //points exactly on an edge count, points just outside don't
+    @Test
+    void testFindCollisionOnEdge() {
+        Triangle t = new Triangle(new java.awt.Point(0, 0), new java.awt.Point(4, 0), new java.awt.Point(0, 4));
+        BoundedVolumeHierarchy bvh = new BoundedVolumeHierarchy();
+        bvh.insert(t);
+
+        assertTrue(bvh.findCollision(new java.awt.geom.Point2D.Double(2, 0)).contains(t)); // bottom edge
+        assertTrue(bvh.findCollision(new java.awt.geom.Point2D.Double(2, 2)).contains(t)); // slanted edge
+        assertTrue(bvh.findCollision(new java.awt.geom.Point2D.Double(2.01, 2.01)).isEmpty()); // just outside
+    }
+
+    //centroids all on one side of midrange
+    @Test
+    void testMidrangeOneSideEmpty() {
+        // box midrange is x = 15, but all three centroids are past it
+        Triangle t1 = new Triangle(new java.awt.Point(0, 0), new java.awt.Point(30, 0), new java.awt.Point(30, 1));
+        Triangle t2 = new Triangle(new java.awt.Point(25, 0), new java.awt.Point(30, 0), new java.awt.Point(30, 1));
+        Triangle t3 = new Triangle(new java.awt.Point(26, 0), new java.awt.Point(30, 0), new java.awt.Point(30, 2));
+        BoundedVolumeHierarchy bvh = new BoundedVolumeHierarchy();
+        bvh.setSplitMethod(BVH.SplitMethod.SPLIT_MIDRANGE);
+        bvh.buildBVH(java.util.Arrays.asList(t1, t2, t3));
+
+        assertEquals(Set.of(t1, t2, t3), bvh.findCollision(new java.awt.geom.Point2D.Double(29, 0.5)));
+    }
+
+    @Test
+    void testDrawGUINoGaps() {
+        // top edge sits at gui y = 240, from x = 50 to 350
+        BoundedVolumeHierarchy bvh = new BoundedVolumeHierarchy();
+        bvh.buildBVH(java.util.Arrays.asList(new Triangle(new java.awt.Point(-150, 40), new java.awt.Point(150, 40), new java.awt.Point(0, 80))));
+        Visualization vis = new Visualization();
+        vis.setBoundingVolumeHierarchy(bvh);
+
+        Set<Integer> xs = new HashSet<>();
+        for (java.awt.Point p : vis.drawGUI()) if (p.y == 240) xs.add(p.x);
+        for (int x = 51; x <= 349; x++) assertTrue(xs.contains(x));
+    }
 }

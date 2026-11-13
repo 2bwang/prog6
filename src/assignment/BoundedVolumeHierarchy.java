@@ -454,4 +454,19 @@ public class BoundedVolumeHierarchy implements BVH{
         toStringHelper(node.left, sb, depth + 1);
         toStringHelper(node.right, sb, depth + 1);
     }
+
+    public List<Shape> getShapes() {
+        List<Shape> shapes = new ArrayList<>();
+        getShapesHelper(root, shapes);
+        return shapes;
+    }
+
+    private void getShapesHelper(AVLNode node, List<Shape> shapes) {
+        if (node == null) return;
+        if (node.isLeaf()) shapes.add(node.getShape());
+        else {
+            getShapesHelper(node.getLeft(), shapes);
+            getShapesHelper(node.getRight(), shapes);
+        }
+    }
 }
